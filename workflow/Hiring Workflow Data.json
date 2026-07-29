@@ -1,0 +1,493 @@
+{
+  "name": "Hiring Workflow Data",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1104,
+        -240
+      ],
+      "id": "3d127d05-ffcb-40d8-b1db-9d70a3f22e52",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "const searches = [\n  // 1. Sales Development\n  {\n    query: '(\"sales development representative\" OR \"SDR\") SaaS',\n    role_category: 'Sales Development',\n    location: 'United States'\n  },\n  {\n    query: '(\"business development representative\" OR \"BDR\") SaaS',\n    role_category: 'Sales Development',\n    location: 'United States'\n  },\n\n  // 2. Sales Expansion and Leadership\n  {\n    query: '(\"account executive\" OR \"sales executive\") SaaS',\n    role_category: 'Sales Expansion',\n    location: 'United States'\n  },\n  {\n    query: '(\"sales manager\" OR \"head of sales\" OR \"director of sales\") SaaS',\n    role_category: 'Sales Leadership',\n    location: 'United States'\n  },\n\n  // 3. Revenue Operations and Systems\n  {\n    query: '(\"revenue operations\" OR \"RevOps\") SaaS',\n    role_category: 'Revenue Operations',\n    location: 'United States'\n  },\n  {\n    query: '(\"sales operations\" OR \"sales ops\") SaaS',\n    role_category: 'Revenue Operations',\n    location: 'United States'\n  },\n  {\n    query: '(\"revenue systems\" OR \"sales systems\" OR \"revenue technology\") SaaS',\n    role_category: 'Revenue Systems',\n    location: 'United States'\n  },\n\n  // 4. CRM and GTM Systems\n  {\n    query: '(\"CRM administrator\" OR \"Salesforce administrator\" OR \"HubSpot administrator\") SaaS',\n    role_category: 'CRM Operations',\n    location: 'United States'\n  },\n\n  // 5. Marketing Operations and Growth\n  {\n    query: '(\"marketing operations\" OR \"marketing ops\") SaaS',\n    role_category: 'Marketing Operations',\n    location: 'United States'\n  },\n  {\n    query: '(\"marketing automation\" OR \"marketing automation manager\") SaaS',\n    role_category: 'Marketing Operations',\n    location: 'United States'\n  },\n  {\n    query: '(\"demand generation\" OR \"growth marketing\" OR \"lifecycle marketing\") SaaS',\n    role_category: 'Growth Marketing',\n    location: 'United States'\n  },\n\n  // 6. Customer Success and Support Operations\n  {\n    query: '(\"customer success manager\" OR \"customer success operations\") SaaS',\n    role_category: 'Customer Success',\n    location: 'United States'\n  },\n  {\n    query: '(\"customer support\" OR \"support operations\") SaaS',\n    role_category: 'Customer Support',\n    location: 'United States'\n  },\n\n  // 7. GTM Operations and Leadership\n  {\n    query: '(\"GTM engineer\" OR \"GTM operations\" OR \"GTM systems\") SaaS',\n    role_category: 'GTM Operations',\n    location: 'United States'\n  },\n  {\n    query: '(\"head of GTM\" OR \"director of GTM\" OR \"GTM strategy\") SaaS',\n    role_category: 'GTM Leadership',\n    location: 'United States'\n  }\n];\n\nreturn searches.map((search) => ({\n  json: search\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -928,
+        -112
+      ],
+      "id": "39f0f7e3-ca03-49b7-a14f-be7e58a802b9",
+      "name": "Serarch Queries"
+    },
+    {
+      "parameters": {
+        "url": "https://serpapi.com/search.json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "engine",
+              "value": "google_jobs"
+            },
+            {
+              "name": "q",
+              "value": "={{$json.query}}"
+            },
+            {
+              "name": "location",
+              "value": "={{$json.location}}"
+            },
+            {
+              "name": "hl",
+              "value": "en"
+            },
+            {
+              "name": "api_key",
+              "value": "77ea25ca982e6c5c7ea86fcf9a28b7ede063308be88a36606cef73ed2b9d0a1f"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -832,
+        -416
+      ],
+      "id": "d08297aa-9880-4f0a-a1c4-84bfb7a9c6e6",
+      "name": "SerpAPI Google Jobs"
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = [];\n\nfor (const item of $input.all()) {\n  const response = item.json;\n  const jobs = Array.isArray(response.jobs_results)\n    ? response.jobs_results\n    : [];\n\n  const searchQuery =\n    response.search_parameters?.q ??\n    response.search_parameters?.query ??\n    '';\n\n  const searchLocation =\n    response.search_parameters?.location ??\n    '';\n\n  for (const job of jobs) {\n    output.push({\n      json: {\n        ...job,\n        search_query: searchQuery,\n        search_location: searchLocation\n      }\n    });\n  }\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        -224
+      ],
+      "id": "e2b56df8-8751-41cd-b510-0682d214db23",
+      "name": "Extract Jobs"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const job = $json;\n\nconst extensions = Array.isArray(job.extensions)\n  ? job.extensions\n  : [];\n\nconst detected = job.detected_extensions ?? {};\n\nconst applyOptions = Array.isArray(job.apply_options)\n  ? job.apply_options\n  : [];\n\nconst firstApplyOption = applyOptions[0] ?? {};\n\nconst normalizedTitle = String(job.title ?? '').trim();\nconst normalizedCompany = String(job.company_name ?? '').trim();\n\nreturn {\n  json: {\n    job_id: String(job.job_id ?? '').trim(),\n\n    company_name: normalizedCompany,\n    job_title: normalizedTitle,\n    location: String(job.location ?? '').trim(),\n\n    posted_at_text: String(\n      detected.posted_at ??\n      extensions.find(value =>\n        /hour|day|week|month|today/i.test(String(value))\n      ) ??\n      ''\n    ).trim(),\n\n    employment_type: String(\n      detected.schedule_type ??\n      extensions.find(value =>\n        /full.?time|part.?time|contract|temporary|intern/i.test(\n          String(value)\n        )\n      ) ??\n      ''\n    ).trim(),\n\n    remote: Boolean(\n      detected.work_from_home ||\n      /remote|work from home/i.test(\n        `${job.location ?? ''} ${extensions.join(' ')}`\n      )\n    ),\n\n    source_platform: String(job.via ?? '').trim(),\n\n    job_url: String(\n      firstApplyOption.link ??\n      job.share_link ??\n      ''\n    ).trim(),\n\n    description: String(job.description ?? '')\n      .replace(/\\s+/g, ' ')\n      .trim(),\n\n    search_query: String(job.search_query ?? '').trim(),\n    search_location: String(job.search_location ?? '').trim(),\n\n    collected_at: new Date().toISOString()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -512,
+        -384
+      ],
+      "id": "ab13f68a-834f-47f6-a250-ac993f7326e7",
+      "name": "Normalize Jobs"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const title = String($json.job_title ?? '').toLowerCase();\n\nlet roleCategory = null;\nlet signalCategory = null;\n\n// GTM Operations and Systems\nif (\n  title.includes('gtm engineer') ||\n  title.includes('gtm operations') ||\n  title.includes('gtm systems') ||\n  title.includes('go-to-market operations') ||\n  title.includes('go to market operations')\n) {\n  roleCategory = 'GTM Operations';\n  signalCategory = 'GTM Infrastructure Investment';\n\n// GTM Leadership\n} else if (\n  title.includes('head of gtm') ||\n  title.includes('director of gtm') ||\n  title.includes('gtm strategy') ||\n  title.includes('head of go-to-market') ||\n  title.includes('director of go-to-market')\n) {\n  roleCategory = 'GTM Leadership';\n  signalCategory = 'GTM Transformation';\n\n// Revenue Systems and CRM\n} else if (\n  title.includes('revenue systems') ||\n  title.includes('sales systems') ||\n  title.includes('revenue technology')\n) {\n  roleCategory = 'Revenue Systems';\n  signalCategory = 'Revenue Technology Investment';\n\n} else if (\n  title.includes('crm administrator') ||\n  title.includes('salesforce administrator') ||\n  title.includes('hubspot administrator')\n) {\n  roleCategory = 'CRM Operations';\n  signalCategory = 'CRM Infrastructure Investment';\n\n// Revenue Operations\n} else if (\n  title.includes('revenue operations') ||\n  title.includes('sales operations') ||\n  title.includes('revops') ||\n  title.includes('sales ops')\n) {\n  roleCategory = 'Revenue Operations';\n  signalCategory = 'Revenue Process Complexity';\n\n// Marketing Operations\n} else if (\n  title.includes('marketing operations') ||\n  title.includes('marketing automation') ||\n  title.includes('marketing ops')\n) {\n  roleCategory = 'Marketing Operations';\n  signalCategory = 'Marketing Operations Expansion';\n\n// Growth and Demand Generation\n} else if (\n  title.includes('demand generation') ||\n  title.includes('growth marketing') ||\n  title.includes('lifecycle marketing') ||\n  title.includes('performance marketing')\n) {\n  roleCategory = 'Growth Marketing';\n  signalCategory = 'Demand Generation Expansion';\n\n// Customer Success\n} else if (\n  title.includes('customer success operations') ||\n  title.includes('customer success manager') ||\n  title.includes('customer success')\n) {\n  roleCategory = 'Customer Success';\n  signalCategory = 'Customer Lifecycle Expansion';\n\n// Customer Support\n} else if (\n  title.includes('customer support') ||\n  title.includes('support operations') ||\n  title.includes('technical support')\n) {\n  roleCategory = 'Customer Support';\n  signalCategory = 'Support Volume Expansion';\n\n// Sales Leadership\n} else if (\n  title.includes('sales manager') ||\n  title.includes('head of sales') ||\n  title.includes('director of sales') ||\n  title.includes('vp of sales') ||\n  title.includes('vice president of sales')\n) {\n  roleCategory = 'Sales Leadership';\n  signalCategory = 'Sales Team Expansion';\n\n// Account Executives\n} else if (\n  title.includes('account executive') ||\n  title.includes('sales executive')\n) {\n  roleCategory = 'Sales Expansion';\n  signalCategory = 'Sales Capacity Expansion';\n\n// SDR and BDR\n} else if (\n  title.includes('sales development representative') ||\n  title.includes('business development representative') ||\n  title.includes('sales development') ||\n  /\\bsdr\\b/.test(title) ||\n  /\\bbdr\\b/.test(title)\n) {\n  roleCategory = 'Sales Development';\n  signalCategory = 'Outbound Sales Expansion';\n}\n\nreturn {\n  json: {\n    ...$json,\n    is_target_role: Boolean(roleCategory),\n    role_category: roleCategory,\n    signal_category: signalCategory\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -192,
+        -528
+      ],
+      "id": "8968819b-11e2-4416-90c5-a96510211f09",
+      "name": "Classify Target Roles"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2889f463-620f-4e2d-9230-72e5f1a7fb20",
+              "leftValue": "={{$json.is_target_role}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        0,
+        -400
+      ],
+      "id": "742a72cf-0bb7-4bb1-920f-bdb02884b6ab",
+      "name": "Filter"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const company = String($json.company_name ?? '')\n  .toLowerCase()\n  .replace(/[^a-z0-9]/g, '');\n\nconst title = String($json.job_title ?? '')\n  .toLowerCase()\n  .replace(/[^a-z0-9]/g, '');\n\nreturn {\n  json: {\n    ...$json,\n    deduplication_key: `${company}-${title}`\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        128,
+        -240
+      ],
+      "id": "72231502-f59a-4b20-b5e7-4ba6eb4ec0bd",
+      "name": "Create Deduplication Key"
+    },
+    {
+      "parameters": {
+        "compare": "selectedFields",
+        "fieldsToCompare": "deduplication_key",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        320,
+        -416
+      ],
+      "id": "0684ba10-2118-4964-9b01-caa4b06196d0",
+      "name": "Remove Duplicates"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const description = String($json.description ?? '');\n\nreturn {\n  json: {\n    'Company Name': $json.company_name ?? '',\n    'Job Title': $json.job_title ?? '',\n    'Role Category': $json.role_category ?? '',\n    'Signal Category': $json.signal_category ?? '',\n\n    'Job Location': $json.location ?? '',\n    'Remote': $json.remote ?? false,\n    'Employment Type': $json.employment_type ?? '',\n    'Posted': $json.posted_at_text ?? '',\n\n    'Source Platform': $json.source_platform ?? '',\n    'Job URL': $json.job_url ?? '',\n\n    'Job Description':\n      description.length > 500\n        ? `${description.slice(0, 500)}...`\n        : description\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        -176
+      ],
+      "id": "0fb278f1-a455-4c31-be0b-be89575845a0",
+      "name": "Prepare CSV Rows"
+    },
+    {
+      "parameters": {
+        "options": {
+          "fileName": "hiring_signals.csv"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        592,
+        -384
+      ],
+      "id": "0aa3dad1-818a-4caf-9b6c-2d503b0b6822",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const errors = [];\n\nconst jobTitle = String($json.job_title ?? '').trim();\nconst companyName = String($json.company_name ?? '').trim();\nconst jobUrl = String($json.job_url ?? '').trim();\n\nif (!jobTitle) {\n  errors.push('Missing job title');\n}\n\nif (!companyName) {\n  errors.push('Missing company name');\n}\n\nif (!jobUrl) {\n  errors.push('Missing job URL');\n}\n\nreturn {\n  json: {\n    ...$json,\n    validation_status: errors.length === 0 ? 'valid' : 'invalid',\n    validation_errors: errors,\n    is_valid_job: errors.length === 0\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        -48
+      ],
+      "id": "3066323f-af4b-4f5b-8a3c-48574269d439",
+      "name": "Validate Job Data"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4b3f1e0f-9cd8-4990-b3aa-9e9ed6fd88b8",
+              "leftValue": "={{$json.is_valid_job}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -304,
+        -288
+      ],
+      "id": "fed895d5-aae9-488e-b69f-4bdb6eeb795d",
+      "name": "Valid Job?"
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  json: {\n    timestamp: new Date().toISOString(),\n    reason: $json.validation_errors,\n    company: $json.company_name,\n    title: $json.job_title,\n    url: $json.job_url\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        -32
+      ],
+      "id": "de58c486-f8d3-4db1-a203-ec1d7c6e8b04",
+      "name": "Log Invalid Jobs"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "invalid_jobs",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        48,
+        -16
+      ],
+      "id": "754baa5c-3319-481d-8916-c6a9593b2aac",
+      "name": "Aggregate Invalid Jobs"
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "invalid_jobs",
+        "options": {
+          "fileName": "invalid_jobs.csv"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        256,
+        -16
+      ],
+      "id": "9d921dd8-3af8-476d-b2d0-5e33ed34fd47",
+      "name": "Write Invalid Jobs CSV"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fileItem = $input.first();\n\nconst validJobCount = $('Prepare CSV Rows').all().length;\n\nreturn [\n  {\n    json: {\n      pipeline_status: 'SUCCESS',\n      message: 'Hiring signal pipeline completed successfully.',\n      valid_jobs_exported: validJobCount,\n      output_file: 'hiring_signals.csv',\n      completed_at: new Date().toISOString()\n    },\n\n    // Preserve the generated CSV file\n    binary: fileItem.binary ?? {}\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        -384
+      ],
+      "id": "3c73b437-a808-460e-b799-40cdf93019fd",
+      "name": "Pipeline Success"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Serarch Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Serarch Queries": {
+      "main": [
+        [
+          {
+            "node": "SerpAPI Google Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SerpAPI Google Jobs": {
+      "main": [
+        [
+          {
+            "node": "Extract Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Jobs": {
+      "main": [
+        [
+          {
+            "node": "Normalize Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Jobs": {
+      "main": [
+        [
+          {
+            "node": "Validate Job Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Target Roles": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "Create Deduplication Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Deduplication Key": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Duplicates": {
+      "main": [
+        [
+          {
+            "node": "Prepare CSV Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare CSV Rows": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Pipeline Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Job Data": {
+      "main": [
+        [
+          {
+            "node": "Valid Job?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Job?": {
+      "main": [
+        [
+          {
+            "node": "Classify Target Roles",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Invalid Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Invalid Jobs": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Invalid Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Invalid Jobs": {
+      "main": [
+        [
+          {
+            "node": "Write Invalid Jobs CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "0feaedd3-8e06-499b-beec-290ff9d7dd9e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4c05287f813370181466d899bc10cfc739166959aef39abfee5df873329611bb"
+  },
+  "id": "W2nswdNbX2fVu0Lc",
+  "tags": []
+}
